@@ -1,0 +1,50 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.sw.viaprime'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.sw.viaprime.demo'
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+    }
+
+    signingConfigs {
+        demoRelease {
+            if (project.hasProperty('DEMO_KEYSTORE')) {
+                storeFile file(project.property('DEMO_KEYSTORE'))
+                storePassword project.property('DEMO_STORE_PASSWORD')
+                keyAlias project.property('DEMO_KEY_ALIAS')
+                keyPassword project.property('DEMO_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+        release {
+            minifyEnabled false
+            if (project.hasProperty('DEMO_KEYSTORE')) {
+                signingConfig signingConfigs.demoRelease
+            }
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'org.osmdroid:osmdroid-android:6.1.18'
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+}
