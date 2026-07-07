@@ -1,2 +1,2 @@
 -keep class org.osmdroid.** { *; }
--keep class fi.iki.elonen.** { *; }
+-dontwarn org.osmdroid.**

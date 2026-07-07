@@ -1,5 +1,4 @@
-name: Android APK Build
-
+name: Android Build
 on:
   push:
     branches: [ main ]
@@ -7,46 +6,33 @@ on:
 
 jobs:
   build:
-    name: Build Via Prime Demo APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Java 17
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Setup Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Accept Android licenses and install SDK
+      - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: 8.10.2
-
-      - name: Create temporary demo release key
-        run: |
-          keytool -genkeypair -v -keystore demo-release.jks -storepass viaprime_demo_010 -alias viaprime -keypass viaprime_demo_010 -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Via Prime Demo,O=SW,C=BR"
-
-      - name: Build signed release APK
-        run: gradle :app:assembleRelease --no-daemon --stacktrace -PDEMO_KEYSTORE=$PWD/demo-release.jks -PDEMO_STORE_PASSWORD=viaprime_demo_010 -PDEMO_KEY_ALIAS=viaprime -PDEMO_KEY_PASSWORD=viaprime_demo_010
-
+          gradle-version: '8.7'
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --stacktrace
       - name: Rename APK
         run: |
-          mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk dist/ViaPrimeDemo-v0.1.0-release.apk
-          sha256sum dist/ViaPrimeDemo-v0.1.0-release.apk > dist/ViaPrimeDemo-v0.1.0-release.sha256.txt
-
-      - name: Upload APK artifact
+          mkdir -p out
+          SHA_SHORT="${GITHUB_SHA::7}"
+          cp app/build/outputs/apk/debug/app-debug.apk "out/ViaPrimeDemo-v0.1.2-${SHA_SHORT}.apk"
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ViaPrimeDemo-v0.1.0-release-apk
-          path: dist/*
+          name: ViaPrimeDemo-v0.1.2-apk
+          path: out/*.apk

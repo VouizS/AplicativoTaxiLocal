@@ -1,154 +1,163 @@
 package com.sw.viaprime;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import fi.iki.elonen.NanoHTTPD;
+import org.json.JSONObject;
+import java.io.*;
+import java.net.*;
+import java.util.*;
 
-public class LocalHubServer extends NanoHTTPD {
-    private final Object lock = new Object();
-    private final RideState state = new RideState();
+public class LocalHubServer {
+    public static final int PORT = 8080;
+    private static volatile boolean running = false;
+    private static ServerSocket serverSocket;
+    private static Thread serverThread;
 
-    public LocalHubServer(int port) { super(port); }
+    private static final Object lock = new Object();
+    private static double clientLat = -16.94155;
+    private static double clientLng = -50.44485;
+    private static double driverLat = -16.94120;
+    private static double driverLng = -50.44450;
+    private static boolean hasClient = false;
+    private static boolean driverOnline = false;
+    private static String status = "idle";
+    private static String driverName = "Motorista demo";
+    private static String vehicleModel = "Sedan executivo";
+    private static String vehicleColor = "Preto";
+    private static String vehiclePlate = "VP-0001";
+    private static long updatedAt = System.currentTimeMillis();
 
-    public void boot() throws IOException { start(NanoHTTPD.SOCKET_READ_TIMEOUT, false); }
+    public static boolean isRunning() { return running; }
 
-    @Override
-    public Response serve(IHTTPSession session) {
+    public static void start() throws IOException {
+        if (running) return;
+        serverSocket = new ServerSocket(PORT);
+        running = true;
+        serverThread = new Thread(() -> {
+            while (running) {
+                try {
+                    Socket socket = serverSocket.accept();
+                    handle(socket);
+                } catch (Exception ignored) { }
+            }
+        }, "ViaPrimeLocalHub");
+        serverThread.setDaemon(true);
+        serverThread.start();
+    }
+
+    public static void stop() {
+        running = false;
+        try { if (serverSocket != null) serverSocket.close(); } catch (Exception ignored) { }
+    }
+
+    private static void handle(Socket socket) {
         try {
-            Method method = session.getMethod();
-            if (Method.OPTIONS.equals(method)) return cors(newFixedLengthResponse(Response.Status.OK, "text/plain", "OK"));
-            if (Method.POST.equals(method) || Method.PUT.equals(method)) {
-                try { session.parseBody(new HashMap<String, String>()); } catch (Exception ignored) {}
-            }
-            String uri = session.getUri();
-            Map<String, List<String>> p = session.getParameters();
+            BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String line = br.readLine();
+            if (line == null) { socket.close(); return; }
+            String[] parts = line.split(" ");
+            String target = parts.length > 1 ? parts[1] : "/state";
+            while ((line = br.readLine()) != null && line.length() > 0) { }
+            String response = route(target);
+            byte[] data = response.getBytes("UTF-8");
+            OutputStream out = socket.getOutputStream();
+            out.write(("HTTP/1.1 200 OK\r\n"+
+                    "Content-Type: application/json; charset=utf-8\r\n"+
+                    "Access-Control-Allow-Origin: *\r\n"+
+                    "Cache-Control: no-store\r\n"+
+                    "Content-Length: "+data.length+"\r\n"+
+                    "Connection: close\r\n\r\n").getBytes("UTF-8"));
+            out.write(data);
+            out.flush();
+        } catch (Exception ignored) {
+        } finally {
+            try { socket.close(); } catch (Exception ignored) { }
+        }
+    }
 
-            if ("/api/health".equals(uri)) return json("{\"ok\":true,\"service\":\"Via Prime Local Hub\"}");
-            if ("/api/state".equals(uri)) return json(toJson());
-
+    private static String route(String target) {
+        try {
+            URI uri = new URI(target);
+            String path = uri.getPath();
+            Map<String, String> q = query(uri.getRawQuery());
             synchronized (lock) {
-                if ("/api/requestRide".equals(uri)) {
-                    state.rideId = UUID.randomUUID().toString();
-                    state.status = "requested";
-                    state.clientName = val(p, "clientName", "Cliente demo");
-                    state.clientLat = dbl(p, "lat", 0);
-                    state.clientLon = dbl(p, "lon", 0);
-                    state.destination = val(p, "destination", "Destino não informado");
-                    state.note = val(p, "note", "");
-                    state.requestedAt = System.currentTimeMillis();
-                    return json(toJson());
+                if ("/reset".equals(path)) {
+                    hasClient = false; driverOnline = false; status = "idle";
+                } else if ("/clientLocation".equals(path)) {
+                    clientLat = d(q.get("lat"), clientLat); clientLng = d(q.get("lng"), clientLng); hasClient = true;
+                } else if ("/driverLocation".equals(path)) {
+                    driverLat = d(q.get("lat"), driverLat); driverLng = d(q.get("lng"), driverLng);
+                } else if ("/driverOnline".equals(path)) {
+                    driverOnline = true;
+                    driverLat = d(q.get("lat"), driverLat); driverLng = d(q.get("lng"), driverLng);
+                    driverName = s(q.get("name"), driverName);
+                    vehicleModel = s(q.get("model"), vehicleModel);
+                    vehicleColor = s(q.get("color"), vehicleColor);
+                    vehiclePlate = s(q.get("plate"), vehiclePlate);
+                    if ("idle".equals(status) || "cancelled".equals(status) || "finished".equals(status)) status = "driver_online";
+                } else if ("/driverOffline".equals(path)) {
+                    driverOnline = false;
+                    if ("driver_online".equals(status)) status = "idle";
+                } else if ("/clientRequest".equals(path)) {
+                    clientLat = d(q.get("lat"), clientLat); clientLng = d(q.get("lng"), clientLng); hasClient = true; status = "requested";
+                } else if ("/accept".equals(path)) {
+                    status = "accepted";
+                } else if ("/arrived".equals(path)) {
+                    status = "arrived";
+                } else if ("/start".equals(path)) {
+                    status = "started";
+                } else if ("/finish".equals(path)) {
+                    status = "finished";
+                } else if ("/cancel".equals(path)) {
+                    status = "cancelled";
+                } else if ("/profile".equals(path)) {
+                    driverName = s(q.get("name"), driverName);
+                    vehicleModel = s(q.get("model"), vehicleModel);
+                    vehicleColor = s(q.get("color"), vehicleColor);
+                    vehiclePlate = s(q.get("plate"), vehiclePlate);
                 }
-                if ("/api/updateClient".equals(uri)) {
-                    state.clientLat = dbl(p, "lat", state.clientLat);
-                    state.clientLon = dbl(p, "lon", state.clientLon);
-                    state.clientName = val(p, "clientName", state.clientName);
-                    return json(toJson());
-                }
-                if ("/api/driverOnline".equals(uri)) {
-                    state.driverOnline = true;
-                    updateDriverFields(p);
-                    if (state.status.length() == 0) state.status = "driver_online";
-                    return json(toJson());
-                }
-                if ("/api/acceptRide".equals(uri)) {
-                    state.driverOnline = true;
-                    updateDriverFields(p);
-                    if (state.rideId.length() == 0) state.rideId = UUID.randomUUID().toString();
-                    state.status = "accepted";
-                    return json(toJson());
-                }
-                if ("/api/updateDriver".equals(uri)) {
-                    state.driverOnline = true;
-                    updateDriverFields(p);
-                    if ("accepted".equals(state.status)) state.status = "on_way";
-                    return json(toJson());
-                }
-                if ("/api/arrived".equals(uri)) { state.status = "arrived"; return json(toJson()); }
-                if ("/api/start".equals(uri)) { state.status = "started"; return json(toJson()); }
-                if ("/api/finish".equals(uri)) { state.status = "finished"; return json(toJson()); }
-                if ("/api/cancel".equals(uri)) { state.status = "cancelled"; return json(toJson()); }
-                if ("/api/reset".equals(uri)) { state.reset(); return json(toJson()); }
+                updatedAt = System.currentTimeMillis();
             }
-            return cors(newFixedLengthResponse(Response.Status.NOT_FOUND, "application/json", "{\"error\":\"not_found\"}"));
+            return stateJson();
         } catch (Exception e) {
-            return cors(newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", "{\"error\":\"" + esc(e.getMessage()) + "\"}"));
+            return "{\"ok\":false,\"error\":\""+esc(e.getMessage())+"\"}";
         }
     }
 
-    private void updateDriverFields(Map<String, List<String>> p) {
-        state.driverLat = dbl(p, "lat", state.driverLat);
-        state.driverLon = dbl(p, "lon", state.driverLon);
-        state.driverName = val(p, "driverName", state.driverName.length() == 0 ? "Motorista demo" : state.driverName);
-        state.carModel = val(p, "carModel", state.carModel.length() == 0 ? "Sedan executivo" : state.carModel);
-        state.carColor = val(p, "carColor", state.carColor.length() == 0 ? "Preto" : state.carColor);
-        state.carPlate = val(p, "carPlate", state.carPlate.length() == 0 ? "VP-0001" : state.carPlate);
-    }
-
-    private Response json(String body) { return cors(newFixedLengthResponse(Response.Status.OK, "application/json", body)); }
-    private Response cors(Response r) {
-        r.addHeader("Access-Control-Allow-Origin", "*");
-        r.addHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-        r.addHeader("Access-Control-Allow-Headers", "Content-Type");
-        return r;
-    }
-
-    private String toJson() {
-        synchronized (lock) {
-            return "{" +
-                "\"rideId\":\"" + esc(state.rideId) + "\"," +
-                "\"status\":\"" + esc(state.status) + "\"," +
-                "\"clientName\":\"" + esc(state.clientName) + "\"," +
-                "\"clientLat\":" + state.clientLat + "," +
-                "\"clientLon\":" + state.clientLon + "," +
-                "\"destination\":\"" + esc(state.destination) + "\"," +
-                "\"note\":\"" + esc(state.note) + "\"," +
-                "\"driverOnline\":" + state.driverOnline + "," +
-                "\"driverName\":\"" + esc(state.driverName) + "\"," +
-                "\"driverLat\":" + state.driverLat + "," +
-                "\"driverLon\":" + state.driverLon + "," +
-                "\"carModel\":\"" + esc(state.carModel) + "\"," +
-                "\"carColor\":\"" + esc(state.carColor) + "\"," +
-                "\"carPlate\":\"" + esc(state.carPlate) + "\"," +
-                "\"requestedAt\":" + state.requestedAt +
-                "}";
+    private static String stateJson() {
+        try {
+            JSONObject o = new JSONObject();
+            synchronized (lock) {
+                o.put("ok", true);
+                o.put("status", status);
+                o.put("clientLat", clientLat);
+                o.put("clientLng", clientLng);
+                o.put("driverLat", driverLat);
+                o.put("driverLng", driverLng);
+                o.put("hasClient", hasClient);
+                o.put("driverOnline", driverOnline);
+                o.put("driverName", driverName);
+                o.put("vehicleModel", vehicleModel);
+                o.put("vehicleColor", vehicleColor);
+                o.put("vehiclePlate", vehiclePlate);
+                o.put("updatedAt", updatedAt);
+            }
+            return o.toString();
+        } catch (Exception e) {
+            return "{\"ok\":false}";
         }
     }
 
-    private static String val(Map<String, List<String>> p, String key, String def) {
-        List<String> v = p.get(key);
-        if (v == null || v.isEmpty() || v.get(0) == null || v.get(0).trim().isEmpty()) return def;
-        return v.get(0).trim();
-    }
-    private static double dbl(Map<String, List<String>> p, String key, double def) {
-        try { return Double.parseDouble(val(p, key, String.valueOf(def))); } catch (Exception e) { return def; }
-    }
-    private static String esc(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ");
-    }
-
-    private static class RideState {
-        String rideId = "";
-        String status = "";
-        String clientName = "Cliente demo";
-        double clientLat = 0;
-        double clientLon = 0;
-        String destination = "";
-        String note = "";
-        boolean driverOnline = false;
-        String driverName = "";
-        double driverLat = 0;
-        double driverLon = 0;
-        String carModel = "";
-        String carColor = "";
-        String carPlate = "";
-        long requestedAt = 0;
-        void reset() {
-            rideId = ""; status = ""; clientName = "Cliente demo"; clientLat = 0; clientLon = 0; destination = ""; note = "";
-            driverOnline = false; driverName = ""; driverLat = 0; driverLon = 0; carModel = ""; carColor = ""; carPlate = ""; requestedAt = 0;
+    private static Map<String, String> query(String raw) throws UnsupportedEncodingException {
+        Map<String, String> map = new HashMap<>();
+        if (raw == null || raw.isEmpty()) return map;
+        for (String p : raw.split("&")) {
+            int i = p.indexOf('=');
+            String k = i >= 0 ? p.substring(0, i) : p;
+            String v = i >= 0 ? p.substring(i + 1) : "";
+            map.put(URLDecoder.decode(k, "UTF-8"), URLDecoder.decode(v, "UTF-8"));
         }
+        return map;
     }
+    private static double d(String v, double def) { try { return v == null ? def : Double.parseDouble(v); } catch (Exception e) { return def; } }
+    private static String s(String v, String def) { return v == null || v.trim().isEmpty() ? def : v.trim(); }
+    private static String esc(String s) { return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\""); }
 }
