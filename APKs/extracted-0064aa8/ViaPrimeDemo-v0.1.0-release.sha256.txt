@@ -1,1 +1,0 @@
-dd671354a360cfbd26cdf9354f0e63490bfc622010fca96ba8f22570745ae717  dist/ViaPrimeDemo-v0.1.0-release.apk
