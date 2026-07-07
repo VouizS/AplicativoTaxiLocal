@@ -36,7 +36,7 @@ public class MainActivity extends Activity implements LocationListener {
     private static final int WHITE = Color.rgb(245, 240, 230);
     private static final double FALLBACK_LAT = -16.94155;
     private static final double FALLBACK_LNG = -50.44485;
-    private static final String VERSION = "0.1.2";
+    private static final String VERSION = "0.1.3";
 
     private final ITileSource TILE_CARTO_HD = new XYTileSource("Via Prime HD", 0, 20, 512, "@2x.png", new String[]{
             "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
@@ -112,7 +112,7 @@ public class MainActivity extends Activity implements LocationListener {
         sub.setGravity(Gravity.CENTER);
         page.addView(sub);
         addSpace(page, 18);
-        TextView desc = text("Protótipo funcional v"+VERSION+" • Mapa HD • Localização real • Motoristas próximos", 14, Color.rgb(170,164,154), false);
+        TextView desc = text("Protótipo funcional v"+VERSION+" • Mapa HD • Ícone 2D • Motoristas próximos", 14, Color.rgb(170,164,154), false);
         desc.setGravity(Gravity.CENTER);
         page.addView(desc);
         addSpace(page, 26);
@@ -193,7 +193,7 @@ public class MainActivity extends Activity implements LocationListener {
         menuRow = new LinearLayout(this); menuRow.setOrientation(LinearLayout.HORIZONTAL); menuRow.setGravity(Gravity.RIGHT); menuRow.setPadding(0,0,0,0);
         FrameLayout.LayoutParams rowLp = new FrameLayout.LayoutParams(-1, dp(54)); rowLp.setMargins(dp(18), dp(134), dp(18), 0); root.addView(menuRow, rowLp);
         menuBtn = miniButton("Menu", v -> showHome()); menuRow.addView(menuBtn, miniLp());
-        lanBtn = miniButton("LAN", v -> showLanDialog()); menuRow.addView(lanBtn, miniLp());
+        lanBtn = miniButton("Rede", v -> showLanDialog()); menuRow.addView(lanBtn, miniLp());
         centerBtn = miniButton("Centro", v -> centerOnMe()); menuRow.addView(centerBtn, miniLp());
         mapBtn = miniButton("Mapa", v -> cycleMapMode()); menuRow.addView(mapBtn, miniLp());
 
@@ -237,7 +237,7 @@ public class MainActivity extends Activity implements LocationListener {
         primaryBtn.setText("idle".equals(status) || "driver_online".equals(status) || "cancelled".equals(status) || "finished".equals(status) ? "Solicitar transporte neste local" : "Atualizar acompanhamento");
         primaryBtn.setOnClickListener(v -> { if ("idle".equals(status) || "driver_online".equals(status) || "cancelled".equals(status) || "finished".equals(status)) requestRide(); else fetchState(); });
         secondaryBtn.setVisibility(View.VISIBLE); secondaryBtn.setText("Destino demonstrativo / Para onde?"); secondaryBtn.setOnClickListener(v -> showDestinationDialog());
-        thirdBtn.setVisibility(View.VISIBLE); thirdBtn.setText("Configurar servidor LAN"); thirdBtn.setOnClickListener(v -> showLanDialog());
+        thirdBtn.setVisibility(View.VISIBLE); thirdBtn.setText("Configurar conexão da demo"); thirdBtn.setOnClickListener(v -> showLanDialog());
         if (!driverOnline) showOrHideDriver(false, 0, 0, null);
     }
 
@@ -256,7 +256,7 @@ public class MainActivity extends Activity implements LocationListener {
         else if ("arrived".equals(status)) { secondaryBtn.setText("Iniciar atendimento"); secondaryBtn.setOnClickListener(v -> sendAction("start")); }
         else if ("started".equals(status)) { secondaryBtn.setText("Finalizar atendimento"); secondaryBtn.setOnClickListener(v -> sendAction("finish")); }
         else { secondaryBtn.setText("Perfil do veículo"); secondaryBtn.setOnClickListener(v -> showVehicleDialog()); }
-        thirdBtn.setVisibility(View.VISIBLE); thirdBtn.setText("Configurar servidor LAN"); thirdBtn.setOnClickListener(v -> showLanDialog());
+        thirdBtn.setVisibility(View.VISIBLE); thirdBtn.setText("Configurar conexão da demo"); thirdBtn.setOnClickListener(v -> showLanDialog());
     }
 
     private void renderAdminPanel(String status, boolean driverOnline, boolean hasClient, boolean connected, JSONObject st) {
@@ -464,7 +464,7 @@ public class MainActivity extends Activity implements LocationListener {
         LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); int p = dp(18); box.setPadding(p, p, p, p);
         TextView info = text("Para dois aparelhos: inicie a Central/Admin em um celular e coloque aqui http://IP_DA_CENTRAL:8080.\nIP deste aparelho: " + getLocalIp(), 14, Color.WHITE, false);
         box.addView(info); box.addView(input);
-        new AlertDialog.Builder(this).setTitle("Servidor LAN da demo").setView(box).setPositiveButton("Salvar", (d,w) -> { serverUrl = input.getText().toString().trim(); if (!serverUrl.startsWith("http")) serverUrl = "http://"+serverUrl; prefs.edit().putString("serverUrl", serverUrl).apply(); fetchState(); }).setNegativeButton("Cancelar", null).setNeutralButton("Usar local", (d,w) -> { startLocalServer(true); }).show();
+        new AlertDialog.Builder(this).setTitle("Conexão da demo").setView(box).setPositiveButton("Salvar", (d,w) -> { serverUrl = input.getText().toString().trim(); if (!serverUrl.startsWith("http")) serverUrl = "http://"+serverUrl; prefs.edit().putString("serverUrl", serverUrl).apply(); fetchState(); }).setNegativeButton("Cancelar", null).setNeutralButton("Usar local", (d,w) -> { startLocalServer(true); }).show();
     }
 
     private void showVehicleDialog() {
@@ -481,7 +481,7 @@ public class MainActivity extends Activity implements LocationListener {
 
     private void showDestinationDialog() {
         final EditText input = field(""); input.setHint("Ex.: Rodoviária, hospital, hotel, bairro...");
-        new AlertDialog.Builder(this).setTitle("Destino demonstrativo").setMessage("Na demo v0.1.2, o destino é visual/informativo. A busca real de endereços entra nas próximas versões.").setView(input).setPositiveButton("Salvar", (d,w)-> Toast.makeText(this, "Destino registrado para apresentação", Toast.LENGTH_SHORT).show()).setNegativeButton("Cancelar", null).show();
+        new AlertDialog.Builder(this).setTitle("Destino demonstrativo").setMessage("Na demo v0.1.3, o destino é visual/informativo. A busca real de endereços entra nas próximas versões.").setView(input).setPositiveButton("Salvar", (d,w)-> Toast.makeText(this, "Destino registrado para apresentação", Toast.LENGTH_SHORT).show()).setNegativeButton("Cancelar", null).show();
     }
 
     private String statusPt(String s, JSONObject st) {
@@ -510,14 +510,69 @@ public class MainActivity extends Activity implements LocationListener {
     private Drawable round(int color, int r, int stroke, int sw) { GradientDrawable g = new GradientDrawable(); g.setColor(color); g.setCornerRadius(r); if (sw > 0) g.setStroke(dp(sw), stroke); return g; }
     private Drawable circleIcon(int color, int size) { Bitmap b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888); Canvas c = new Canvas(b); Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setColor(Color.WHITE); c.drawCircle(size/2f, size/2f, size/2f, p); p.setColor(color); c.drawCircle(size/2f, size/2f, size*.36f, p); p.setColor(GOLD); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2, size*.08f)); c.drawCircle(size/2f, size/2f, size*.44f, p); return new BitmapDrawable(getResources(), b); }
     private Drawable carIcon(int size, JSONObject st) {
-        Bitmap b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888); Canvas c = new Canvas(b); Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        float cx = size/2f, cy = size/2f;
-        p.setStyle(Paint.Style.FILL); p.setColor(Color.argb(218, 13, 13, 13)); c.drawCircle(cx, cy, size*.45f, p);
-        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(size*.055f); p.setColor(GOLD); c.drawCircle(cx, cy, size*.43f, p);
-        p.setStyle(Paint.Style.FILL); p.setColor(GOLD2); RectF body = new RectF(size*.24f, size*.30f, size*.76f, size*.76f); c.drawRoundRect(body, size*.12f, size*.12f, p);
-        p.setColor(Color.rgb(8,8,8)); RectF roof = new RectF(size*.34f, size*.22f, size*.66f, size*.42f); c.drawRoundRect(roof, size*.09f, size*.09f, p);
-        p.setColor(Color.WHITE); c.drawCircle(size*.33f, size*.72f, size*.07f, p); c.drawCircle(size*.67f, size*.72f, size*.07f, p);
-        p.setColor(Color.argb(90,255,255,255)); c.drawRoundRect(new RectF(size*.28f, size*.36f, size*.72f, size*.58f), size*.08f, size*.08f, p);
+        // Marcador 2D flat, visto de cima: sem render/3D, inspirado na lógica de apps de mobilidade.
+        Bitmap b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        float w = size, h = size;
+
+        // Sombra bem discreta para leitura no mapa, sem efeito 3D.
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.argb(70, 0, 0, 0));
+        c.drawOval(new RectF(w*.24f, h*.77f, w*.76f, h*.88f), p);
+
+        // Pneus laterais, top-view.
+        p.setColor(Color.rgb(8, 8, 8));
+        c.drawRoundRect(new RectF(w*.20f, h*.30f, w*.29f, h*.47f), w*.025f, w*.025f, p);
+        c.drawRoundRect(new RectF(w*.71f, h*.30f, w*.80f, h*.47f), w*.025f, w*.025f, p);
+        c.drawRoundRect(new RectF(w*.20f, h*.58f, w*.29f, h*.75f), w*.025f, w*.025f, p);
+        c.drawRoundRect(new RectF(w*.71f, h*.58f, w*.80f, h*.75f), w*.025f, w*.025f, p);
+
+        // Corpo do sedan executivo: silhueta 2D com frente levemente afunilada.
+        Path body = new Path();
+        body.moveTo(w*.40f, h*.10f);
+        body.lineTo(w*.60f, h*.10f);
+        body.quadTo(w*.73f, h*.12f, w*.74f, h*.25f);
+        body.lineTo(w*.77f, h*.70f);
+        body.quadTo(w*.75f, h*.86f, w*.62f, h*.88f);
+        body.lineTo(w*.38f, h*.88f);
+        body.quadTo(w*.25f, h*.86f, w*.23f, h*.70f);
+        body.lineTo(w*.26f, h*.25f);
+        body.quadTo(w*.27f, h*.12f, w*.40f, h*.10f);
+        body.close();
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(GOLD2);
+        c.drawPath(body, p);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(w*.035f);
+        p.setColor(GOLD);
+        c.drawPath(body, p);
+
+        // Capô, teto e porta-malas em blocos flat.
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.rgb(18, 18, 18));
+        c.drawRoundRect(new RectF(w*.36f, h*.16f, w*.64f, h*.29f), w*.035f, w*.035f, p);
+        c.drawRoundRect(new RectF(w*.32f, h*.35f, w*.68f, h*.58f), w*.045f, w*.045f, p);
+        c.drawRoundRect(new RectF(w*.37f, h*.67f, w*.63f, h*.80f), w*.035f, w*.035f, p);
+
+        // Linhas simples de detalhe, mantendo aspecto 2D.
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(w*.018f);
+        p.setColor(Color.argb(150, 5, 5, 5));
+        c.drawLine(w*.31f, h*.31f, w*.69f, h*.31f, p);
+        c.drawLine(w*.31f, h*.62f, w*.69f, h*.62f, p);
+        c.drawLine(w*.30f, h*.47f, w*.24f, h*.47f, p);
+        c.drawLine(w*.70f, h*.47f, w*.76f, h*.47f, p);
+
+        // Faróis/lanternas para indicar frente do carro no mapa.
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.rgb(255, 248, 210));
+        c.drawCircle(w*.41f, h*.12f, w*.025f, p);
+        c.drawCircle(w*.59f, h*.12f, w*.025f, p);
+        p.setColor(Color.rgb(95, 8, 8));
+        c.drawCircle(w*.40f, h*.87f, w*.022f, p);
+        c.drawCircle(w*.60f, h*.87f, w*.022f, p);
+
         return new BitmapDrawable(getResources(), b);
     }
     private int dp(float v) { return (int)(v * getResources().getDisplayMetrics().density + .5f); }
