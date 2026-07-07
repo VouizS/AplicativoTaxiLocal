@@ -1,5 +1,5 @@
 
-package com.sw.viaprime;
+package __PKG__;
 
 import android.Manifest;
 import android.app.Activity;
