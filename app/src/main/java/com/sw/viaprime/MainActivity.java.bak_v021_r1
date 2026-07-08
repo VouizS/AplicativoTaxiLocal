@@ -56,14 +56,13 @@ public class MainActivity extends Activity {
     private double currentLon = -50.4480;
     private boolean mapReady = false;
     private LocationManager locationManager;
-    private boolean appStarted = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         isMotorista = getPackageName().toLowerCase().contains("motorista");
-        prefs = getSharedPreferences("via_prime_v021", MODE_PRIVATE);
+        prefs = getSharedPreferences("via_prime_v020", MODE_PRIVATE);
         motoristaOnline = prefs.getBoolean("motorista_online", true);
 
         if (Build.VERSION.SDK_INT >= 21) {
@@ -71,102 +70,9 @@ public class MainActivity extends Activity {
             getWindow().setNavigationBarColor(Color.BLACK);
         }
 
-        buildEntryScreen();
-    }
-
-    private void buildEntryScreen() {
-        appStarted = false;
-
-        FrameLayout entryRoot = new FrameLayout(this);
-        entryRoot.setBackgroundColor(Color.BLACK);
-
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.CENTER);
-        content.setPadding(dp(28), dp(28), dp(28), dp(28));
-
-        FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-        );
-        entryRoot.addView(content, contentLp);
-
-        TextView crown = new TextView(this);
-        crown.setText("♛");
-        crown.setGravity(Gravity.CENTER);
-        crown.setTextColor(GOLD);
-        crown.setTextSize(54);
-        crown.setShadowLayer(dp(8), 0, 0, Color.rgb(120, 78, 18));
-        content.addView(crown, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(70)
-        ));
-
-        TextView brand = new TextView(this);
-        brand.setText(isMotorista ? "VIA PRIME\nMOTORISTAS" : "VIA PRIME");
-        brand.setGravity(Gravity.CENTER);
-        brand.setTextColor(GOLD);
-        brand.setTextSize(isMotorista ? 34 : 38);
-        brand.setTypeface(Typeface.DEFAULT_BOLD);
-        brand.setLetterSpacing(0.16f);
-        content.addView(brand);
-
-        TextView tag = new TextView(this);
-        tag.setText(isMotorista ? "ÁREA EXECUTIVA DO MOTORISTA" : "TRANSPORTE EXECUTIVO");
-        tag.setGravity(Gravity.CENTER);
-        tag.setTextColor(WHITE);
-        tag.setTextSize(17);
-        tag.setTypeface(Typeface.DEFAULT_BOLD);
-        tag.setLetterSpacing(0.08f);
-        tag.setPadding(0, dp(10), 0, 0);
-        content.addView(tag);
-
-        TextView subtitle = new TextView(this);
-        subtitle.setText(isMotorista
-                ? "Entre para ficar disponível e receber solicitações reais nas próximas etapas."
-                : "Entre para solicitar transporte executivo com localização real.");
-        subtitle.setGravity(Gravity.CENTER);
-        subtitle.setTextColor(MUTED);
-        subtitle.setTextSize(15);
-        subtitle.setPadding(dp(8), dp(26), dp(8), dp(34));
-        content.addView(subtitle);
-
-        Button enter = goldButton(isMotorista ? "Entrar como Motorista" : "Entrar como Cliente");
-        enter.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { openRoleApp(); }
-        });
-        content.addView(enter, fullButtonLp());
-
-        Button privacy = outlineButton("Privacidade e permissões");
-        privacy.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { showPrivacyDialog(); }
-        });
-        content.addView(privacy, fullButtonLp());
-
-        TextView footer = new TextView(this);
-        footer.setText("Via Prime v0.2.1-r1 • Base separada Cliente/Motoristas");
-        footer.setGravity(Gravity.CENTER);
-        footer.setTextColor(Color.rgb(130, 130, 130));
-        footer.setTextSize(12);
-        footer.setPadding(0, dp(12), 0, 0);
-        content.addView(footer);
-
-        setContentView(entryRoot);
-    }
-
-    private void openRoleApp() {
-        appStarted = true;
         buildLayout();
         setupMap();
         requestLocation();
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (appStarted) {
-            buildEntryScreen();
-        } else {
-            super.onBackPressed();
-        }
     }
 
     private void buildLayout() {
@@ -295,7 +201,7 @@ public class MainActivity extends Activity {
                     ? "Solicitação enviada para: " + destination
                     : "Solicitação enviada. Aguardando confirmação do motorista.");
         } else {
-            panelSubtitle.setText("Motoristas disponíveis na base demonstrativa.");
+            panelSubtitle.setText("Motorista disponível próximo.");
         }
 
         primaryButton = goldButton(requested ? "Atualizar acompanhamento" : "Solicitar transporte neste local");
@@ -323,7 +229,7 @@ public class MainActivity extends Activity {
 
     private void renderDriverPanel() {
         panelSubtitle.setText(motoristaOnline
-                ? "Você está online no modo local. Firebase entra na próxima etapa."
+                ? "Você está online e visível no modo local."
                 : "Você está offline. Ative para receber solicitações.");
 
         primaryButton = goldButton(motoristaOnline ? "Ficar offline" : "Ficar online");
@@ -464,35 +370,14 @@ public class MainActivity extends Activity {
         Toast.makeText(this, "Mapa centralizado na área demonstrativa.", Toast.LENGTH_SHORT).show();
     }
 
-    private void showPrivacyDialog() {
-        final Dialog dialog = premiumDialog();
-        LinearLayout box = dialogBox();
-
-        addDialogTitle(box, "Privacidade e permissões");
-        addDialogSubtitle(box, "O app usa localização para exibir sua posição no mapa e preparar a base de chamadas reais entre cliente e motorista. Nesta etapa não há pagamento, login ou envio de documentos.");
-
-        addInfoLine(box, "Localização", "necessária para mapa e origem da solicitação");
-        addInfoLine(box, "Internet", "necessária para mapa e futura central Firebase");
-        addInfoLine(box, "Perfil", isMotorista ? "dados do veículo ficam salvos no aparelho" : "destino fica salvo no aparelho");
-
-        Button close = goldButton("Entendi");
-        close.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { dialog.dismiss(); }
-        });
-        box.addView(close, fullButtonLp());
-
-        dialog.setContentView(wrapScroll(box));
-        showDialogWindow(dialog);
-    }
-
     private void showMainMenu() {
         final Dialog dialog = premiumDialog();
         LinearLayout box = dialogBox();
 
         addDialogTitle(box, isMotorista ? "Via Prime Motoristas" : "Via Prime Cliente");
         addDialogSubtitle(box, isMotorista
-                ? "Entrada separada: somente área do motorista."
-                : "Entrada separada: somente área do cliente.");
+                ? "Aplicativo separado para operação do motorista."
+                : "Aplicativo separado para solicitação do cliente.");
 
         String center = prefs.getString("center_code", "LOCAL");
         String destination = prefs.getString("destination", "não definido");
@@ -578,7 +463,7 @@ public class MainActivity extends Activity {
         LinearLayout box = dialogBox();
 
         addDialogTitle(box, "Conexão da central");
-        addDialogSubtitle(box, "Modo local preservado nesta etapa. A próxima versão conectará Cliente e Motoristas via Firebase.");
+        addDialogSubtitle(box, "Use um código para parear os apps nesta demo. O modo local mantém tudo no ambiente de teste.");
 
         final EditText code = premiumField("Código da central");
         code.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);

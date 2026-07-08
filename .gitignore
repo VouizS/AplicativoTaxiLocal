@@ -1,0 +1,16 @@
+.gradle/
+build/
+app/build/
+local.properties
+.DS_Store
+
+# Gerados locais / artifacts
+APKs/
+ViaPrime_v020_APKs/
+build_download*/
+backup_v020*/
+backup_v021*/
+*.apk
+*.apk.sha256.txt
+*.sha256.txt
+*.zip

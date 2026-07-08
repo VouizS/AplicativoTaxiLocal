@@ -1,4 +1,5 @@
 name: Android Build
+
 on:
   push:
     branches: [ main ]
@@ -7,54 +8,89 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout current commit
         uses: actions/checkout@v4
+
+      - name: Print commit
+        run: |
+          echo "BUILDING_COMMIT=${GITHUB_SHA}"
+          git log --oneline -1
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-      - name: Install Android SDK packages
-        run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.7'
-      - name: Build debug APK
-        run: gradle :app:assembleClienteDebug :app:assembleMotoristaDebug --stacktrace
-      - name: Rename APK
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Safety check
+        run: |
+          echo "Verificando se existe APK antigo versionado..."
+          if git ls-files | grep -E '(^APKs/|\.apk$|ViaPrimeDemo-v0\.1\.3)'; then
+            echo "ERRO: APK/artifact antigo está versionado."
+            exit 1
+          fi
+
+          echo "Verificando referências antigas no workflow..."
+          if grep -R 'ViaPrimeDemo-v0.1.3\|v0.2.0\|app-debug.apk' .github/workflows; then
+            echo "ERRO: referência antiga encontrada no workflow."
+            exit 1
+          fi
+
+      - name: Build Cliente e Motoristas
+        run: |
+          chmod +x ./gradlew || true
+          if [ -x ./gradlew ]; then
+            ./gradlew :app:clean :app:assembleClienteDebug :app:assembleMotoristaDebug --stacktrace
+          else
+            gradle :app:clean :app:assembleClienteDebug :app:assembleMotoristaDebug --stacktrace
+          fi
+
+      - name: Rename APKs
         run: |
           mkdir -p out
           SHA_SHORT="${GITHUB_SHA::7}"
-          SHA_SHORT="${SHA_SHORT:-${GITHUB_SHA::7}}"
 
-          CLIENTE_APK="$(find app/build/outputs/apk -type f -iname "*cliente*debug*.apk" | head -n 1)"
-
-          MOTORISTA_APK="$(find app/build/outputs/apk -type f \( -iname "*motorista*debug*.apk" -o -iname "*motoristas*debug*.apk" \) | head -n 1)"
-
-          if [ -z "$CLIENTE_APK" ]; then CLIENTE_APK="$(find app/build/outputs/apk -type f -path "*/cliente/debug/*.apk" | head -n 1)"; fi
-
-          if [ -z "$MOTORISTA_APK" ]; then MOTORISTA_APK="$(find app/build/outputs/apk -type f -path "*/motorista/debug/*.apk" | head -n 1)"; fi
-
-          echo "APKs encontrados:"
-
+          echo "APKs gerados pelo build atual:"
           find app/build/outputs/apk -type f -name "*.apk" -print
 
-          test -n "$CLIENTE_APK"
+          CLIENTE_APK="$(find app/build/outputs/apk -type f -path "*/cliente/debug/*.apk" | head -n 1)"
+          MOTORISTA_APK="$(find app/build/outputs/apk -type f -path "*/motorista/debug/*.apk" | head -n 1)"
 
-          test -n "$MOTORISTA_APK"
+          if [ -z "$CLIENTE_APK" ]; then
+            CLIENTE_APK="$(find app/build/outputs/apk -type f -iname "*cliente*debug*.apk" | head -n 1)"
+          fi
 
-          cp "$CLIENTE_APK" "out/ViaPrimeCliente-v0.2.0-${SHA_SHORT}.apk"
+          if [ -z "$MOTORISTA_APK" ]; then
+            MOTORISTA_APK="$(find app/build/outputs/apk -type f \( -iname "*motorista*debug*.apk" -o -iname "*motoristas*debug*.apk" \) | head -n 1)"
+          fi
 
-          cp "$MOTORISTA_APK" "out/ViaPrimeMotoristas-v0.2.0-${SHA_SHORT}.apk"
+          if [ -z "$CLIENTE_APK" ]; then
+            echo "ERRO: APK Cliente não encontrado."
+            exit 1
+          fi
 
+          if [ -z "$MOTORISTA_APK" ]; then
+            echo "ERRO: APK Motoristas não encontrado."
+            exit 1
+          fi
+
+          cp "$CLIENTE_APK" "out/ViaPrimeCliente-v0.2.1-r1-${SHA_SHORT}.apk"
+          cp "$MOTORISTA_APK" "out/ViaPrimeMotoristas-v0.2.1-r1-${SHA_SHORT}.apk"
           sha256sum out/*.apk > out/SHA256SUMS.txt
-      - name: Upload APK
+
+          echo "Artifacts finais:"
+          ls -lh out
+
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: ViaPrimeDemo-v0.1.3-apk
-          path: out/*.apk
+          name: ViaPrime-v0.2.1-r1-APKs
+          path: out/
